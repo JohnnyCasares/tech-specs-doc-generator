@@ -1,0 +1,17 @@
+{
+  "name": "doc-generator",
+  "version": "1.0.0",
+  "description": "Chrome extension: pick a DOM element on any internal page, describe a UI change, and export a before/after .docx spec for developers.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  },
+  "dependencies": {
+    "docx": "^9.5.1"
+  }
+}

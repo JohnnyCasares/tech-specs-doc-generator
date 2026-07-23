@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>UI Change Doc Generator</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <h1>UI Change Doc Generator</h1>
+
+  <section class="step">
+    <h2>1. Pick the anchor element</h2>
+    <p class="hint">Pick your change type below first, then click "Activate picker" and click the target on the page — a column header for a grid change, or a form field for a field change.</p>
+    <div class="row">
+      <button id="activatePicker">Activate picker</button>
+      <button id="resetBtn" class="secondary">Reset</button>
+    </div>
+    <p id="anchorStatus" class="status">No element picked yet.</p>
+  </section>
+
+  <section class="step">
+    <h2>2. Describe the change</h2>
+    <form id="changeForm">
+      <label>
+        Change type
+        <select id="changeType">
+          <option value="insert-column">Insert table column (grid)</option>
+          <option value="insert-field">Insert field (form: label + input)</option>
+        </select>
+      </label>
+      <label>
+        Position relative to picked element
+        <select id="position">
+          <option value="after">After</option>
+          <option value="before">Before</option>
+        </select>
+      </label>
+      <label>
+        New field / column name
+        <input id="fieldName" type="text" placeholder="e.g. test column" required />
+      </label>
+      <div class="field" id="styleBlock">
+        <span class="field-label">Column style</span>
+        <p id="styleStatus" class="status">Matches the picked element.</p>
+        <div class="row">
+          <button type="button" id="pickStyleSource" class="secondary">Copy style from another element…</button>
+          <button type="button" id="resetStyleSource" class="link" hidden>Use picked element</button>
+        </div>
+      </div>
+      <label>
+        Notes for the developer
+        <textarea id="notes" rows="3" placeholder="Any extra detail (data type, source field, etc.)"></textarea>
+      </label>
+      <label>
+        Requested by
+        <input id="requestedBy" type="text" placeholder="Your name" />
+      </label>
+    </form>
+  </section>
+
+  <section class="step">
+    <h2>3. Capture before / after</h2>
+    <div class="row">
+      <button id="captureBefore">Capture "before"</button>
+      <button id="applyAndCaptureAfter">Apply change &amp; capture "after"</button>
+    </div>
+    <div class="thumbs">
+      <figure>
+        <figcaption>Before</figcaption>
+        <img id="beforeThumb" alt="Before screenshot" />
+      </figure>
+      <figure>
+        <figcaption>After</figcaption>
+        <img id="afterThumb" alt="After screenshot" />
+      </figure>
+    </div>
+  </section>
+
+  <section class="step">
+    <h2>4. Generate document</h2>
+    <button id="generateDocx" disabled>Generate .docx</button>
+  </section>
+
+  <p id="log" class="status" role="status"></p>
+
+  <script src="../dist/sidepanel.js"></script>
+</body>
+</html>

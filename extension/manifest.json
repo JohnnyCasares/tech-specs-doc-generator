@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "UI Change Doc Generator",
+  "version": "0.1.0",
+  "description": "Pick an element on any page, describe a UI change, and export a before/after .docx spec for developers.",
+  "action": {},
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
+  "background": {
+    "service_worker": "dist/service-worker.js"
+  },
+  "permissions": ["sidePanel", "scripting", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
