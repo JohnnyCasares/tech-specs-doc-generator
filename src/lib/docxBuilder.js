@@ -40,14 +40,22 @@ export async function buildDocx(report) {
     pageUrl,
     requestedBy,
     changeType,
-    position,
+    direction,
     fieldName,
     styleBasis,
+    target,
     notes,
     caveat,
     beforeImageArrayBuffer,
     afterImageArrayBuffer,
   } = report;
+
+  const DIRECTION_PHRASE = {
+    above: 'Above the picked element',
+    below: 'Below the picked element',
+    left: 'To the left of the picked element',
+    right: 'To the right of the picked element',
+  };
 
   const children = [
     new Paragraph({ text: 'UI Change Request', heading: HeadingLevel.TITLE }),
@@ -57,11 +65,23 @@ export async function buildDocx(report) {
 
     new Paragraph({ text: 'Requested Change', heading: HeadingLevel.HEADING_1 }),
     labeledParagraph('Change type', changeType),
-    labeledParagraph('Position', `${position} the picked element`),
+    labeledParagraph('Placement', DIRECTION_PHRASE[direction] || direction),
     labeledParagraph('New field name', fieldName),
     labeledParagraph('Styling', styleBasis),
     labeledParagraph('Notes', notes),
   ];
+
+  // PeopleSoft-specific target identity — the part a developer needs to locate
+  // the element in App Designer (record.field, control type, required, etc.).
+  if (target) {
+    children.push(new Paragraph({ text: 'Target element (PeopleSoft)', heading: HeadingLevel.HEADING_1 }));
+    if (target.kind) children.push(labeledParagraph('Kind', target.kind));
+    if (target.label) children.push(labeledParagraph('Label', target.label));
+    if (target.fieldId) children.push(labeledParagraph('HTML id / field', target.fieldId));
+    if (target.baseId && target.baseId !== target.fieldId) children.push(labeledParagraph('Base id (record.field)', target.baseId));
+    if (target.controlType) children.push(labeledParagraph('Control type', target.controlType));
+    if (target.kind === 'field') children.push(labeledParagraph('Required', target.required ? 'Yes' : 'No'));
+  }
 
   if (caveat) {
     children.push(

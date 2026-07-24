@@ -10,7 +10,7 @@
 
   <section class="step">
     <h2>1. Pick the anchor element</h2>
-    <p class="hint">Pick your change type below first, then click "Activate picker" and click the target on the page — a column header for a grid change, or a form field for a field change.</p>
+    <p class="hint">Click "Activate picker", then click the target on the page (a column, field, tile, button, or section). The change type is detected automatically — override it below if needed.</p>
     <div class="row">
       <button id="activatePicker">Activate picker</button>
       <button id="resetBtn" class="secondary">Reset</button>
@@ -24,19 +24,26 @@
       <label>
         Change type
         <select id="changeType">
+          <option value="auto">Auto-detect (recommended)</option>
           <option value="insert-column">Insert table column (grid)</option>
-          <option value="insert-field">Insert field (form: label + input)</option>
+          <option value="insert-element">Insert element (tile / field / button / section)</option>
         </select>
       </label>
+      <div class="field">
+        <span class="field-label">Placement (relative to the picked element)</span>
+        <div class="dirpad" id="dirpad">
+          <button type="button" class="dir" data-dir="above" title="Above">↑</button>
+          <div class="dirpad-row">
+            <button type="button" class="dir" data-dir="left" title="Left">←</button>
+            <span class="dirpad-dot">◉</span>
+            <button type="button" class="dir" data-dir="right" title="Right">→</button>
+          </div>
+          <button type="button" class="dir" data-dir="below" title="Below">↓</button>
+        </div>
+        <p class="hint" id="dirHint">Below</p>
+      </div>
       <label>
-        Position relative to picked element
-        <select id="position">
-          <option value="after">After</option>
-          <option value="before">Before</option>
-        </select>
-      </label>
-      <label>
-        New field / column name
+        New name / label
         <input id="fieldName" type="text" placeholder="e.g. test column" required />
       </label>
       <div class="field" id="styleBlock">

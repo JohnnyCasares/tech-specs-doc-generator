@@ -87,7 +87,10 @@ function insertCellIntoRow(row, targetColIndex, { fieldName, headerDonor }) {
 // Best-effort: aligns by summed colSpan per row within each table. Rows whose
 // earlier columns carry a rowSpan from a prior row are not modeled (documented
 // v1 limitation) and can drift on complex grids.
-export function insertColumn(anchorEl, { position, fieldName, headerStyleDonor }) {
+export function insertColumn(anchorEl, { direction, position, fieldName, headerStyleDonor }) {
+  // Columns are horizontal: left = before, right = after. `position` kept for
+  // backward compatibility; above/below don't apply to a column and default to right.
+  position = direction === 'left' ? 'before' : direction === 'right' ? 'after' : (position || 'after');
   // Defensive: callers should already pass a <th>/<td> (the picker snaps to
   // one), but re-resolve here too in case the picked element is nested text.
   const anchorCell = anchorEl.closest('th, td') || anchorEl;
@@ -134,5 +137,13 @@ export function insertColumn(anchorEl, { position, fieldName, headerStyleDonor }
 }
 
 export function removeAllGhosts(root = document) {
+  // Unwrap directional flex-wrappers first, returning the original element(s) to
+  // their place, then remove the ghost clones.
+  root.querySelectorAll('[data-docgen-wrap="1"]').forEach((wrap) => {
+    const parent = wrap.parentElement;
+    if (!parent) return;
+    while (wrap.firstChild) parent.insertBefore(wrap.firstChild, wrap);
+    wrap.remove();
+  });
   root.querySelectorAll('[data-docgen-ghost="1"]').forEach((el) => el.remove());
 }

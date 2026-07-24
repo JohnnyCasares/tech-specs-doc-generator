@@ -92,6 +92,60 @@ button.link {
   cursor: pointer;
 }
 
+/* Directional placement pad */
+.dirpad {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.dirpad-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dir {
+  width: 36px;
+  height: 32px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  background: #fff;
+  color: #2563eb;
+  border: 1px solid #cbd5e1;
+}
+
+.dir:hover:not(:disabled) {
+  border-color: #2563eb;
+}
+
+.dir.selected {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.dir:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.dirpad-dot {
+  width: 36px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+#dirHint {
+  margin: 2px 0 0;
+  font-weight: 600;
+  color: #2563eb;
+}
+
 input,
 select,
 textarea {

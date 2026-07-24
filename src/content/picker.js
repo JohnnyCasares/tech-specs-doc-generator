@@ -1,6 +1,6 @@
 import { MessageType } from '../lib/messages.js';
 import { insertColumn, removeAllGhosts } from '../lib/tableColumn.js';
-import { insertField, resolveFieldUnit } from '../lib/cloneField.js';
+import { insertClone, resolveInsertTarget, classifyElement } from '../lib/cloneUnit.js';
 import { getUnionRectInTopFrame } from '../lib/geometry.js';
 
 // Injected on demand (all_frames: true) each time the user clicks "Activate picker".
@@ -16,13 +16,33 @@ import { getUnionRectInTopFrame } from '../lib/geometry.js';
   let hoverEl = null;
   let pickModeActive = false;
   let pickPurpose = 'anchor'; // 'anchor' | 'style'
-  let currentChangeType = 'insert-column';
+  let currentChangeType = 'auto'; // 'auto' | 'insert-column' | 'insert-element'
 
-  // Resolve the raw clicked node to the meaningful unit for the active change
-  // type: a table cell for column inserts, a whole field unit for field inserts.
-  function resolveByChangeType(el, changeType) {
-    if (changeType === 'insert-field') return resolveFieldUnit(el);
-    return el.closest('th, td') || el; // insert-column (and default)
+  // The single element to outline on hover. In auto mode the classifier decides
+  // (cell for grids, field/unit elsewhere); a manual override forces the mode.
+  function hoverTarget(el, changeType) {
+    if (changeType === 'auto') return classifyElement(el).target || el;
+    if (changeType === 'insert-element') {
+      const t = resolveInsertTarget(el);
+      return t.fieldNode || t.nodes[0] || el;
+    }
+    return el.closest('th, td') || el; // insert-column
+  }
+
+  // Rich, spec-worthy metadata about what was picked (incl. the detected change
+  // type so the side panel can reflect it), for the .docx.
+  function describePick(rawEl, changeType) {
+    if (changeType === 'auto') {
+      const c = classifyElement(rawEl);
+      return { tagName: (c.target || rawEl).tagName, changeType: c.changeType, ...c.meta };
+    }
+    if (changeType === 'insert-element') {
+      const t = resolveInsertTarget(rawEl);
+      const primary = t.fieldNode || t.nodes[0] || rawEl;
+      return { tagName: primary.tagName, changeType: 'insert-element', ...t.meta };
+    }
+    const cell = rawEl.closest('th, td') || rawEl;
+    return { tagName: cell.tagName, changeType: 'insert-column', kind: 'grid-column', label: (cell.textContent || '').trim().slice(0, 60) };
   }
 
   const HOVER_OUTLINE = { anchor: '2px solid #2563eb', style: '2px solid #7c3aed' };
@@ -31,7 +51,7 @@ import { getUnionRectInTopFrame } from '../lib/geometry.js';
     if (!pickModeActive) return;
     const target = pickPurpose === 'style'
       ? (e.target.closest('th, td') || e.target)
-      : resolveByChangeType(e.target, currentChangeType);
+      : hoverTarget(e.target, currentChangeType);
     // Moving within the same resolved unit (over its nested markup) must NOT
     // re-save the outline — otherwise our own highlight gets stored as the
     // "previous" value and restoring it leaves the outline stuck on the page.
@@ -81,8 +101,7 @@ import { getUnionRectInTopFrame } from '../lib/geometry.js';
       chrome.runtime.sendMessage({ type: MessageType.STYLE_SOURCE_PICKED, payload: describe(styleSourceElement) });
     } else {
       pickedRaw = e.target;
-      const unit = resolveByChangeType(pickedRaw, currentChangeType);
-      chrome.runtime.sendMessage({ type: MessageType.ANCHOR_PICKED, payload: describe(unit) });
+      chrome.runtime.sendMessage({ type: MessageType.ANCHOR_PICKED, payload: describePick(pickedRaw, currentChangeType) });
     }
   }
 
@@ -109,7 +128,7 @@ import { getUnionRectInTopFrame } from '../lib/geometry.js';
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     switch (msg.type) {
       case MessageType.SET_CHANGE_TYPE: {
-        currentChangeType = msg.changeType || 'insert-column';
+        currentChangeType = msg.changeType || 'auto';
         sendResponse({ ok: true });
         return false;
       }
@@ -124,16 +143,18 @@ import { getUnionRectInTopFrame } from '../lib/geometry.js';
           return false;
         }
         try {
-          const changeType = msg.payload.changeType || 'insert-column';
+          const effectiveType = currentChangeType === 'auto'
+            ? classifyElement(pickedRaw).changeType
+            : currentChangeType;
           let elements;
-          if (changeType === 'insert-field') {
-            elements = insertField(resolveFieldUnit(pickedRaw), msg.payload);
-          } else {
+          if (effectiveType === 'insert-column') {
             const anchor = pickedRaw.closest('th, td') || pickedRaw;
             const headerStyleDonor = msg.payload.styleMode === 'custom' && styleSourceElement
               ? styleSourceElement
               : anchor;
             elements = insertColumn(anchor, { ...msg.payload, headerStyleDonor });
+          } else {
+            elements = insertClone(resolveInsertTarget(pickedRaw), msg.payload);
           }
           afterPaint(() => {
             let bounds;

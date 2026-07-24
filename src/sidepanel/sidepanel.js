@@ -6,7 +6,8 @@ const el = {
   resetBtn: document.getElementById('resetBtn'),
   anchorStatus: document.getElementById('anchorStatus'),
   changeType: document.getElementById('changeType'),
-  position: document.getElementById('position'),
+  dirpad: document.getElementById('dirpad'),
+  dirHint: document.getElementById('dirHint'),
   fieldName: document.getElementById('fieldName'),
   styleBlock: document.getElementById('styleBlock'),
   styleStatus: document.getElementById('styleStatus'),
@@ -28,6 +29,9 @@ const state = {
   pageUrl: '',
   pickedFrameId: null,
   anchorPreview: null,
+  pickMeta: null, // spec metadata about the picked element (kind, fieldId, label, controlType, required)
+  effectiveType: null, // resolved change type from auto-detect: 'insert-column' | 'insert-element'
+  direction: 'below', // above | below | left | right
   styleMode: 'anchor', // 'anchor' | 'custom'
   styleSourcePreview: null,
   beforeDataUrl: null,
@@ -35,10 +39,48 @@ const state = {
   afterHighlightResolved: null,
 };
 
+const DIR_LABELS = { above: 'Above', below: 'Below', left: 'Left', right: 'Right' };
+
+function setDirection(dir) {
+  state.direction = dir;
+  el.dirpad.querySelectorAll('.dir').forEach((b) => b.classList.toggle('selected', b.dataset.dir === dir));
+  el.dirHint.textContent = DIR_LABELS[dir] || dir;
+}
+
+el.dirpad.addEventListener('click', (e) => {
+  const btn = e.target.closest('.dir');
+  if (btn && !btn.disabled) setDirection(btn.dataset.dir);
+});
+
+// The change type that's actually in effect: the manual override if the user
+// chose one, otherwise whatever auto-detect resolved on the last pick.
+function effectiveTypeNow() {
+  const dd = el.changeType.value;
+  if (dd !== 'auto') return dd;
+  return state.effectiveType;
+}
+
+// A doc-friendly change-type label from the effective type + detected kind.
+function changeTypeLabel() {
+  const eff = effectiveTypeNow();
+  if (eff === 'insert-column') return 'Insert table column';
+  if (eff === 'insert-element') return state.pickMeta?.kind ? `Insert ${state.pickMeta.kind}` : 'Insert element';
+  return el.changeType.selectedOptions[0].textContent;
+}
+
 // The style-source picker only makes sense for grid columns; a field insert is
-// a native clone, so its style always matches. Hide the block outside column mode.
+// a native clone, so its style always matches. Columns are horizontal, so
+// above/below don't apply there. Driven by the effective (detected/overridden) type.
 function updateChangeTypeUi() {
-  el.styleBlock.hidden = el.changeType.value !== 'insert-column';
+  const isColumn = effectiveTypeNow() === 'insert-column';
+  el.styleBlock.hidden = !isColumn;
+
+  el.dirpad.querySelectorAll('.dir').forEach((b) => {
+    const vertical = b.dataset.dir === 'above' || b.dataset.dir === 'below';
+    b.disabled = isColumn && vertical;
+  });
+  if (isColumn && (state.direction === 'above' || state.direction === 'below')) setDirection('right');
+  else setDirection(state.direction);
 }
 
 // Keep the injected picker's hover-snapping aligned with the selected change
@@ -91,12 +133,30 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (tabId === state.tabId && changeInfo.url) state.pageUrl = changeInfo.url;
 });
 
+// Human-readable summary of the picked element, incl. PeopleSoft identity.
+function describePickText(m) {
+  if (!m) return 'No element picked yet.';
+  if (m.kind === 'field') {
+    const bits = [m.label ? `"${m.label}"` : '(no label)'];
+    if (m.controlType) bits.push(m.controlType);
+    if (m.required) bits.push('required');
+    if (m.fieldId) bits.push(`id: ${m.fieldId}`);
+    return `Detected field — ${bits.join(' · ')}`;
+  }
+  if (m.kind === 'grid-column') return `Detected column — "${m.label || '(empty)'}"`;
+  if (m.kind) return `Detected ${m.kind} — "${m.label || '(empty)'}"`;
+  return `Detected <${(m.tagName || '').toLowerCase()}>`;
+}
+
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (msg.type === MessageType.ANCHOR_PICKED) {
     state.pickedFrameId = sender.frameId ?? 0;
     state.anchorPreview = msg.payload;
-    el.anchorStatus.textContent = `Picked <${msg.payload.tagName.toLowerCase()}> "${msg.payload.preview || '(empty)'}"`;
-    log('Element picked. Fill in the change details, then capture before/after.');
+    state.pickMeta = msg.payload;
+    state.effectiveType = msg.payload.changeType || null;
+    el.anchorStatus.textContent = describePickText(msg.payload);
+    updateChangeTypeUi();
+    log('Element detected. Set placement/details, then capture before/after.');
   } else if (msg.type === MessageType.STYLE_SOURCE_PICKED) {
     state.styleMode = 'custom';
     state.styleSourcePreview = msg.payload;
@@ -195,12 +255,15 @@ el.resetBtn.addEventListener('click', async () => {
   }
   state.pickedFrameId = null;
   state.anchorPreview = null;
+  state.pickMeta = null;
+  state.effectiveType = null;
   state.styleMode = 'anchor';
   state.styleSourcePreview = null;
   state.beforeDataUrl = null;
   state.afterDataUrl = null;
   state.afterHighlightResolved = null;
   el.anchorStatus.textContent = 'No element picked yet.';
+  updateChangeTypeUi();
   updateStyleStatus();
   el.beforeThumb.src = '';
   el.afterThumb.src = '';
@@ -238,7 +301,7 @@ el.applyAndCaptureAfter.addEventListener('click', async () => {
         type: MessageType.APPLY_CHANGE,
         payload: {
           changeType: el.changeType.value,
-          position: el.position.value,
+          direction: state.direction,
           fieldName: el.fieldName.value.trim(),
           styleMode: state.styleMode,
         },
@@ -282,18 +345,18 @@ el.generateDocx.addEventListener('click', async () => {
       state.afterDataUrl ? dataUrlToArrayBuffer(state.afterDataUrl) : null,
     ]);
 
-    const isField = el.changeType.value === 'insert-field';
+    const isClone = effectiveTypeNow() === 'insert-element';
 
-    let caveat = isField
-      ? 'The new field is a visual mock cloned from an existing field (ids and values stripped); wiring it to a real data source is up to the developer.'
+    let caveat = isClone
+      ? 'The new element is a visual mock cloned from an existing one (ids, values, and click actions stripped); wiring it to real data or navigation is up to the developer.'
       : 'Column insertion aligns cells by summed colSpan; complex grids with rowSpan on earlier columns may need manual adjustment by the developer.';
     if (state.afterHighlightResolved === false) {
       caveat += ' The "after" screenshot has no highlight box — the change location could not be geometrically resolved (likely a cross-origin nested frame).';
     }
 
     let styleBasis;
-    if (isField) {
-      styleBasis = 'Cloned from the picked field, so styling matches natively.';
+    if (isClone) {
+      styleBasis = 'Cloned from the picked element, so styling matches natively.';
     } else if (state.styleMode === 'custom' && state.styleSourcePreview) {
       styleBasis = `Matches the style of <${state.styleSourcePreview.tagName.toLowerCase()}> "${state.styleSourcePreview.preview || '(empty)'}"`;
     } else {
@@ -303,10 +366,11 @@ el.generateDocx.addEventListener('click', async () => {
     const blob = await buildDocx({
       pageUrl: state.pageUrl,
       requestedBy: el.requestedBy.value.trim(),
-      changeType: el.changeType.selectedOptions[0].textContent,
-      position: el.position.value,
+      changeType: changeTypeLabel(),
+      direction: state.direction,
       fieldName: el.fieldName.value.trim(),
       styleBasis,
+      target: state.pickMeta,
       notes: el.notes.value.trim(),
       caveat,
       beforeImageArrayBuffer,

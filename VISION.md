@@ -1,5 +1,22 @@
 # Vision: UI Change Doc Generator
 
+## TODO — near-term (make change types dynamic; UI polish)
+
+The current UI makes the user choose the change type ("Insert table column" vs "Insert element") *before* picking — but the user shouldn't have to say what they're modifying; the tool can detect it. PeopleSoft's DOM is highly consistent (see [[peoplesoft-dom-taxonomy]] and the PlaywrightTA best-practices doc), so a classifier can infer the element kind from the clicked element and pick the right operation automatically.
+
+- [ ] **Auto-detect element kind on pick.** Add a single classifier (`src/lib/classifyElement.js`) that walks up from the clicked element and returns `{ kind, unit, operation }` by matching a small registry of PeopleSoft wrappers, in priority order:
+  - `th`/`td` inside a `<table>` → **grid column** → `insert-column`
+  - `.ps_grid-row.nuitile` / `[aria-roledescription="Tile"]` → **tile** → clone
+  - `.ps_box-button` / `.PSPUSHBUTTONWRAPPER` / bare button → **button** → clone
+  - `.ps_box-edit` (label + `.ps_box-control`) → **field** → clone
+  - `.ps_box-group` / `fieldset` → **group box / section** → clone
+  - fallback: nearest ancestor containing an input → generic clone
+- [ ] **Collapse the two change-type options into one "Insert" (auto).** Keep `insert-column` vs clone as an internal routing detail, not a user choice. Show the detected kind as a read-only chip ("Detected: tile") with an optional override if the guess is wrong.
+- [ ] **Reuse the field-type inference idea** from PlaywrightTA's `utils/dumpFieldType.js` (classify by `className`/`type`/`inputMode`, detect `${id}$prompt` `ps_icon-date` calendars, `$N` indexed grid ids) to enrich the `.docx` with the field's semantic kind (string/number/date).
+- [ ] **UI polish pass** (deferred): the side panel layout, clearer step flow, detected-kind chip, and better empty/error states.
+
+Later operations (from the earlier menu, not yet built): **Modify label/text**, **Remove element**, **Annotate/comment** — each slots into the same picker + interpreter pattern.
+
 ## Where this is today (v1)
 
 Deterministic and user-driven, no AI, no network calls, no API key:
